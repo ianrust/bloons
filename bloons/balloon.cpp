@@ -1,37 +1,31 @@
-#include <balloon.h>
+#include "Balloon.h"
 
-Balloon::Balloon() {
-	_led = AcceLED(9,6,8);
-	_led.begin();
+Balloon::Balloon(unsigned int numLeds, unsigned int portNumber) {
+	_led = &AcceLED(numLeds, portNumber, 7);
+	_led->begin();
 }
 
-Balloon::update() {
-	tapped = this.tapped();
-	// Determine color to display
-	// (function of mode + input data)
-
-
-	// update color
-	this.setColor()
+void Balloon::update() {
+	bool tapped = this->was_tapped();
+  if (tapped) {
+    Serial.println("Tap triggered");
+    this->setColor(random(0, 170),random(0, 170),random(0, 170));
+  }
 }
 
-
-bool Balloon::tapped() {
+bool Balloon::was_tapped() {
 	// Check timer
-	unsigned long time = millis() - this.toggle_millis;
-	// Check mag
-	float mag = this._led.accelMagnitude();
+	unsigned long time_ms = millis() - this->toggle_millis;
 
-	// If outside timer + outside mag, this is a tap
-	if (mag > this.mag_thresh && time > this.bounce_thresh) {
-		this.toggle_millis = millis();
-		return true
+  // I have no idea why, but calling this twice makes it work.
+  this->_led->accelMagnitude();
+	if (this->_led->accelMagnitude() > this->mag_thresh && time_ms > this->bounce_thresh) {
+		this->toggle_millis = millis();
+		return true;
 	}
-	return false
+	return false;
 }
 
-void Balloon::setColor(uint8_t r,
-				  uint8_t g,
-				  uint8_t b) {
-	_led.setColor(r,g,b);	
+void Balloon::setColor(uint8_t r, uint8_t g, uint8_t b) {
+	this->_led->setSolid(r,g,b);	
 }
