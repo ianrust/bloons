@@ -3,16 +3,19 @@
 #include <avr/power.h>
 #endif
 
-#include <Wire.h>
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
+#include <I2Cdev.h>
+#include <MPU6050.h>
+#include <Wire.h>
+
+#define ACCEL_SCALE 0.00057803468
 
 class AcceLED
 {
 public:
     AcceLED(unsigned num_leds_,
-            unsigned led_control_pin_,
-            unsigned accel_select_pin_);
+            unsigned led_control_pin_);
     void begin();
     void setSolid(uint8_t r,
                   uint8_t g,
@@ -30,13 +33,12 @@ public:
 private:
     void zeroCalibration();
 
-    Adafruit_MMA8451 mma;
+    MPU6050 a;
 
     Adafruit_NeoPixel pixels;
 
     unsigned _num_leds,
-             _led_control_pin,
-             _accel_select_pin;
+             _led_control_pin;
 
     unsigned _time_bumped;
 

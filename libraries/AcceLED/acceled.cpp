@@ -1,10 +1,8 @@
 #include <acceled.h>
 
 AcceLED::AcceLED(unsigned num_leds_,
-                   unsigned led_control_pin_,
-                   unsigned accel_select_pin_)
+                   unsigned led_control_pin_)
 {
-    _accel_select_pin = accel_select_pin_;
     _led_control_pin = led_control_pin_;
     _num_leds = num_leds_;
 
@@ -13,12 +11,9 @@ AcceLED::AcceLED(unsigned num_leds_,
 
 void AcceLED::begin()
 {
+    Wire.begin();
     // acceleration setup
-    pinMode(_accel_select_pin, OUTPUT);
-    digitalWrite(_accel_select_pin, LOW);
-    mma = Adafruit_MMA8451();
-    mma.begin(0x1C);
-    mma.setRange(MMA8451_RANGE_2_G);
+    a.initialize();
 
     // led setup
     pixels = Adafruit_NeoPixel(_num_leds,
@@ -58,11 +53,13 @@ void AcceLED::setGradient(uint8_t r1,
 
 void AcceLED::getAccel(sensors_event_t* event)
 {
-    digitalWrite(_accel_select_pin, HIGH);
-    mma.begin(0x1D);
-    mma.read();
-    mma.getEvent(event);
-    digitalWrite(_accel_select_pin, LOW);    
+    int16_t ax, ay, az;
+    int16_t gx, gy, gz;
+    a.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+    event->acceleration.x = ax*ACCEL_SCALE;
+    event->acceleration.y = ay*ACCEL_SCALE;
+    event->acceleration.z = az*ACCEL_SCALE;
 }
 
 unsigned AcceLED::bumpTime(float threshold = 13)
