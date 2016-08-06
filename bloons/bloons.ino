@@ -6,6 +6,7 @@
 #include <Wire.h>
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
+#include <MPU6050.h>
 #include <acceled.h>
 
 AcceLED al1 = AcceLED(5, 5);
