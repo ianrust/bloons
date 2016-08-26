@@ -1,0 +1,9 @@
+[submodule "libraries/Adafruit_NeoPixel"]
+	path = libraries/Adafruit_NeoPixel
+	url = git@github.com:adafruit/Adafruit_NeoPixel.git
+[submodule "libraries/Adafruit_MMA8451_Library"]
+	path = libraries/Adafruit_MMA8451_Library
+	url = git@github.com:adafruit/Adafruit_MMA8451_Library.git
+[submodule "libraries/Adafruit_Sensor"]
+	path = libraries/Adafruit_Sensor
+	url = git@github.com:adafruit/Adafruit_Sensor.git
