@@ -6,59 +6,136 @@
 #include <Wire.h>
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
+#include <I2Cdev.h>
+#include <MPU6050.h>
 #include <acceled.h>
 
-AcceLED al1 = AcceLED(9, 6, 8);
-AcceLED al2 = AcceLED(12, 5, 7);
+#define NUM_BLOONS 5
+
+AcceLED bloons[NUM_BLOONS];
 
 void setup()
 {
-  al1.begin();
-  al2.begin();
-  Serial.begin(9600);
+  bloons[0] = AcceLED(12, 3, 2, false);
+  bloons[1] = AcceLED(12, 5, 4, false);
+  bloons[2] = AcceLED(12, 6, 7, false);
+  bloons[3] = AcceLED(12, 9, 8, false);
+  bloons[4] = AcceLED(12, 11, 13, false);
+  
+  for (int i = 0; i < NUM_BLOONS; i++)
+  {
+    bloons[i].begin();
+  }
 }
 
-boolean toggle1 = false;
-unsigned long toggle_millis1 = 0;
-boolean toggle2 = false;
-unsigned long toggle_millis2 = 0;
+unsigned counter = 0;
+unsigned long count_millis = 0;
+
+unsigned long count_tap = 0;
+
+int state = 0;
+// 0 - cycling
+// 1 - holding/flashing
+// 2 - all hold
+// 3 - fading back
+
+unsigned long state_transition_millis = 0;
+
+int hold_color;
+int hold_balloon_index;
+
+float state_1_millis = 4000;
+float state_2_millis = 10000;
+float state_3_millis = 3000;
 
 void loop()
 {
-  float mag1 = al1.accelMagnitude();
-  float angle1 = 500*al1.angleFromVertical();
+  int dominant_color = 0;
+  float dominant_accel = 0;
+  int dominant_balloon_index = 0;
   
-  if (mag1 > 15 && millis()-toggle_millis1 > 1000)
+  for (int i = 0; i < NUM_BLOONS; i++)
   {
-    toggle1 = !toggle1;
-    toggle_millis1 = millis();
+    int this_color = (i * 10 + counter) % 255;
+    if (state == 0)
+    {
+      bloons[i].setColorWheelGradient(this_color, (this_color+128) % 255);
+    }
+    else if (state == 1)
+    {
+      if (i == hold_balloon_index)
+      {
+        bloons[i].setColorWheelGradient(hold_color, (hold_color+128) % 255);
+      }
+      else
+      {
+        float weight = (state_1_millis - float(millis() - state_transition_millis)) / state_1_millis;
+        if (random(0,10) < 10*weight)
+        {
+          bloons[i].setColorWheelGradient(this_color, (this_color+128) % 255);
+        }
+        else
+        {
+          bloons[i].setColorWheelGradient(hold_color, (hold_color+128) % 255);
+        }
+      }
+    }
+    else if (state == 2)
+    {
+      bloons[i].setColorWheelGradient(hold_color, (hold_color+128) % 255);
+    }
+    else if (state == 3)
+    {
+        float weight = (state_3_millis - float(millis() - state_transition_millis)) / state_3_millis;
+        int average_color = int(hold_color*(weight) + this_color*(1-weight)) % 255;
+        this_color = average_color;
+        bloons[i].setColorWheelGradient(average_color, (average_color+128) % 255);
+    }
+
+    float this_accel = bloons[i].accelMagnitude();
+    if (this_accel > dominant_accel)
+    {
+      dominant_accel = this_accel;
+      dominant_color = this_color;
+      dominant_balloon_index = i;
+    }
+    
   }
   
-  if (toggle1)
-  {
-    al1.setSolid(0,170,min(170,angle1));
-  }
-  else
-  {
-    al1.setSolid(170,0,min(170,angle1));
-  }
   
-  
-  float mag2 = al2.accelMagnitude();
-  float angle2 = 100*al2.angleFromVertical();
-  
-  if (mag2 > 15 && millis()-toggle_millis2 > 1000)
+  //state transitions
+  if (dominant_accel > 20 && (state == 0 || state == 3))
   {
-    toggle2 = !toggle2;
-    toggle_millis2 = millis();
+    state = 2;
+    hold_color = dominant_color;
+    hold_balloon_index = dominant_balloon_index;
+    state_transition_millis = millis();
   }
   
-  if (toggle2)
+  if (millis() - state_transition_millis > state_1_millis &&
+        state == 1)
   {
-    al2.setSolid(0,170,min(170,angle2));
+    state = 2;
+    state_transition_millis = millis();
   }
-  else
+  
+  if (millis() - state_transition_millis > state_2_millis &&
+        state == 2)
   {
-    al2.setSolid(170,0,min(170,angle2));
+    state = 3;
+    state_transition_millis = millis();
+  }
+  
+  if (millis() - state_transition_millis > state_3_millis &&
+        state == 3)
+  {
+    state = 0;
+    state_transition_millis = millis();
+  }
+  
+  if (millis() - count_millis > 1)
+  {
+    counter++;
+    count_millis = millis();
   }
 }

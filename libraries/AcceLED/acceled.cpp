@@ -1,24 +1,50 @@
 #include <acceled.h>
 
+uint32_t wheel(byte pos) {
+  if (pos < 85) {
+   return Adafruit_NeoPixel::Color(pos * 3, 255 - pos * 3, 0);
+  } else if (pos < 170) {
+   pos -= 85;
+   return Adafruit_NeoPixel::Color(255 - pos * 3, 0, pos * 3);
+  } else {
+   pos -= 170;
+   return Adafruit_NeoPixel::Color(0, pos * 3, 255 - pos * 3);
+  }
+}
+
 AcceLED::AcceLED(unsigned num_leds_,
                    unsigned led_control_pin_,
-                   unsigned accel_select_pin_)
+                   unsigned accel_select_pin_,
+                   bool wireless)
 {
     _accel_select_pin = accel_select_pin_;
     _led_control_pin = led_control_pin_;
     _num_leds = num_leds_;
 
+    _wireless = wireless;
+
     _time_bumped = 0;
+
+    _debounce_millis = 200;
+    _tap_time = millis();
 }
 
 void AcceLED::begin()
 {
-    // acceleration setup
-    pinMode(_accel_select_pin, OUTPUT);
-    digitalWrite(_accel_select_pin, LOW);
-    mma = Adafruit_MMA8451();
-    mma.begin(0x1C);
-    mma.setRange(MMA8451_RANGE_2_G);
+    //wireless acceleration setup
+    if (_wireless)
+    {
+        a.initialize();
+    }
+    else
+    {
+        // bunch acceleration setup
+        pinMode(_accel_select_pin, OUTPUT);
+        digitalWrite(_accel_select_pin, LOW);
+        mma = Adafruit_MMA8451();
+        mma.begin(0x1C);
+        mma.setRange(MMA8451_RANGE_2_G);
+    }
 
     // led setup
     pixels = Adafruit_NeoPixel(_num_leds,
@@ -27,42 +53,79 @@ void AcceLED::begin()
     pixels.begin();
 }
 
-void AcceLED::setSolid(uint8_t r,
-                       uint8_t g, 
-                       uint8_t b)
+void AcceLED::update()
+{
+    bumpTime(15);
+}
+
+void AcceLED::checkTap(float threshold)
+{
+    float mag = accelMagnitude();
+
+    if (mag > threshold && millis() - _tap_time > _debounce_millis)
+    {
+        _being_tapped = true;
+        _tap_time = millis();
+    }
+}
+
+void AcceLED::processedTap()
+{
+    _being_tapped = false;
+}
+
+void AcceLED::setSolid(uint32_t color)
 {
     for (unsigned i = 0; i < _num_leds; i++)
     {
-        pixels.setPixelColor(i, pixels.Color(r,g,b));
+        pixels.setPixelColor(i, color);
     }
     pixels.show();
 }
 
-void AcceLED::setGradient(uint8_t r1,
-                          uint8_t g1,
-                          uint8_t b1,
-                          uint8_t r2,
-                          uint8_t g2,
-                          uint8_t b2)
+void AcceLED::setColorWheelGradient(uint8_t wheel_1, uint8_t wheel_2)
 {
     for (unsigned i = 0; i < _num_leds; i++)
     {
-        float proportion = float(i)/float(_num_leds);
-        int r_this = proportion*(r2-r1) + r1;
-        int g_this = proportion*(g2-g1) + g1;
-        int b_this = proportion*(b2-b1) + b1;
-        pixels.setPixelColor(i, pixels.Color(r_this,g_this,b_this));
+        if (i < _num_leds/2)
+        {
+            pixels.setPixelColor(i, wheel(wheel_1));
+        }
+        else
+        {
+            pixels.setPixelColor(i, wheel(wheel_2));
+        }
     }
-    pixels.show();    
+
+    pixels.show();
+}
+
+void AcceLED::setColorWheel(uint8_t wheel_color)
+{
+    setSolid(wheel(wheel_color));
 }
 
 void AcceLED::getAccel(sensors_event_t* event)
 {
-    digitalWrite(_accel_select_pin, HIGH);
-    mma.begin(0x1D);
-    mma.read();
-    mma.getEvent(event);
-    digitalWrite(_accel_select_pin, LOW);    
+    if (_wireless)
+    {
+        int16_t ax, ay, az;
+        int16_t gx, gy, gz;
+        a.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+        event->acceleration.x = ax*ACCEL_SCALE;
+        event->acceleration.y = ay*ACCEL_SCALE;
+        event->acceleration.z = az*ACCEL_SCALE;
+    }
+    else
+    {
+        digitalWrite(_accel_select_pin, HIGH);
+        delay(1);
+        mma.begin(0x1D);
+        mma.read();
+        mma.getEvent(event);
+        digitalWrite(_accel_select_pin, LOW); 
+    }
 }
 
 unsigned AcceLED::bumpTime(float threshold = 13)
@@ -95,6 +158,18 @@ float magnitude(float x,
     return sqrt(x * x +
                 y * y +
                 z * z);
+}
+
+void AcceLED::angleSwitch()
+{
+    if (angleFromVertical() > 0.25)
+    {
+        setSolid(wheel(10));        
+    }
+    else
+    {
+        setSolid(wheel(200));
+    }
 }
 
 float AcceLED::angleFromVertical()
