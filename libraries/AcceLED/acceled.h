@@ -3,13 +3,27 @@
 #include <avr/power.h>
 #endif
 
+#include <StandardCplusplus.h>
 #include <Wire.h>
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
+#include <map>
 
 #define ACCEL_SCALE 0.00057803468
+
+class OtherData
+{
+public:
+    OtherData();
+    void setSeen();
+    void setTap();
+    unsigned long timeSinceSeen();
+private:
+    bool _tapped;
+    unsigned long _millis_since_seen;
+};
 
 class AcceLED
 {
@@ -31,6 +45,8 @@ public:
     unsigned bumpTime(float threshold);
     float accelMagnitude();
     float angleFromVertical();
+    void setSeen(int id);
+    void updateOthers();
 private:
     void zeroCalibration();
 
@@ -54,4 +70,6 @@ private:
     float static_x,
           static_y,
           static_z;
+
+    std::map<int, OtherData > others;
 };

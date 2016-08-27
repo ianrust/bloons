@@ -12,6 +12,27 @@ uint32_t wheel(byte pos) {
   }
 }
 
+
+OtherData::OtherData() : _tapped(false), _millis_since_seen(0)
+{
+    _millis_since_seen = millis();
+}
+
+void OtherData::setSeen()
+{
+    _millis_since_seen = millis();
+}
+
+unsigned long OtherData::timeSinceSeen()
+{
+    return millis() - _millis_since_seen;
+}
+
+void OtherData::setTap()
+{
+    _tapped = true;
+}
+
 AcceLED::AcceLED(unsigned num_leds_,
                    unsigned led_control_pin_,
                    unsigned accel_select_pin_,
@@ -66,6 +87,46 @@ void AcceLED::checkTap(float threshold)
     {
         _being_tapped = true;
         _tap_time = millis();
+    }
+}
+
+void AcceLED::setSeen(int id)
+{
+
+    if (others.find(id) == others.end())
+    {
+        Serial.print("Adding ");
+        Serial.println(id);
+        OtherData other;
+        others.insert(std::make_pair(id, other));
+    }
+    else
+    {
+        // Serial.println("Saw ");
+        // Serial.println(id);
+        others.find(id)->second.setSeen();
+    }
+}
+
+void AcceLED::updateOthers()
+{
+    std::map<int, OtherData >::iterator it = others.begin();
+    while (it != others.end())
+    {
+        Serial.print("have: ");
+        Serial.println(it->first);
+        Serial.print("millis since seen: ");
+        Serial.println(it->second.timeSinceSeen());
+        if (it->second.timeSinceSeen() > 1000)
+        {
+            Serial.println("erasing");
+            others.erase(it);
+        }
+        else
+        {
+            Serial.println("stepping");
+            it++;
+        }
     }
 }
 

@@ -13,3 +13,6 @@
 [submodule "libraries/i2cdevlib"]
 	path = libraries/i2cdevlib
 	url = git@github.com:jrowberg/i2cdevlib.git
+[submodule "libraries/StandardCplusplus"]
+	path = libraries/StandardCplusplus
+	url = git@github.com:maniacbug/StandardCplusplus.git

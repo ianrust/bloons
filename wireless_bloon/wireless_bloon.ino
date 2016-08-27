@@ -3,12 +3,14 @@
 #include <avr/power.h>
 #endif
 
+#include <StandardCplusplus.h>
 #include <Wire.h>
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
 #include <acceled.h>
+#include <map>
 
 #include <RFM69.h>
 #include <SPI.h>
@@ -33,13 +35,20 @@ RFM69 radio;
 
 AcceLED bloon;
 
+unsigned int id;
+
 void setup()
 {
+  randomSeed(analogRead(0));
+
+  id = random(99999);
   
   Serial.begin(9600);
   Serial.print("Node ");
   Serial.print(MYNODEID,DEC);
-  Serial.println(" ready");  
+  Serial.println(" ready");
+  
+  Serial.println(id);
 
   bloon = AcceLED(12, 5, 6, true);
   
@@ -71,21 +80,27 @@ int state = 0;
 // 1 - holding
 
 char recbuffer[100];
-char sendbuffer[1];
+char sendbuffer[6];
+
+boolean must_send = false;
 
 void loop()
 {
+  bloon.updateOthers();
+  memcpy(sendbuffer, &id, 4);
+  
   uint8_t this_color = (counter) % 255;
   if (state == 0)
   {
-    bloon.setColorWheel(this_color);
+//    bloon.setColorWheel(this_color);
   }
   else
   {
-    bloon.setColorWheel(hold_color);
+//    bloon.setColorWheel(hold_color);
   }
 
   float this_accel = bloon.accelMagnitude();
+  sendbuffer[5] =  0;
   if (this_accel > 17 && state == 0)
   {
     state = 1;
@@ -94,9 +109,15 @@ void loop()
     
     // send to other
     Serial.println("sendtry");
-    sendbuffer[0] = (char)this_color;
-    radio.send(TONODEID, sendbuffer, 1);
+    sendbuffer[4] = (char)this_color;
+    sendbuffer[5] = 255;
     Serial.println("send");
+    
+    must_send = true;
+  }
+  else
+  {
+    must_send = false;
   }
  
   if (millis() - state_transition_millis > 2000 && state == 1)
@@ -106,28 +127,38 @@ void loop()
   
   if (radio.receiveDone()) // Got one!
   {
-    state = 1;
-    
+
     int dataLen = radio.DATALEN;
     for (byte i = 0; i < radio.DATALEN; i++) {
-      Serial.print((char)radio.DATA[i]);
       recbuffer[i]=(char)radio.DATA[i];
     }
-    Serial.println("rec");
     
-    hold_color = (uint8_t)recbuffer[0];
-    Serial.println(hold_color);
+    hold_color = (uint8_t)recbuffer[4];
+    unsigned int other_id;
+    memcpy(&other_id, recbuffer, 4);
+    uint8_t tapped = (uint8_t)recbuffer[5];
+    Serial.println(tapped);
+    if (tapped > 127)
+    {
+      state = 1;
+      Serial.println("lol");
+      Serial.println(hold_color);
+      Serial.println(other_id);
+      state_transition_millis = millis();
+    }
+
+//    bloon.setSeen(other_id);
     
     if (radio.ACKRequested())
     {
       radio.sendACK();
     }
-    state_transition_millis = millis();
   }
 
-  if (millis() - count_millis > 10)
+  if (millis() - count_millis > 500 || must_send)
   {
     counter++;
     count_millis = millis();
+    radio.send(TONODEID, sendbuffer, 6);
   }
 }
